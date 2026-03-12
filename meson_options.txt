@@ -1,0 +1,14 @@
+option('gbench',
+       type: 'boolean',
+       value: true,
+       description: 'Build gbench binaries')
+
+option('gtest',
+       type: 'boolean',
+       value: true,
+       description: 'Build gtest tests')
+
+option('punch',
+       type: 'boolean',
+       value: true,
+       description: 'Build Punch')

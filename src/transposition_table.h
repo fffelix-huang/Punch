@@ -1,0 +1,70 @@
+#ifndef PUNCH_TRANSPOSITION_TABLE_H_
+#define PUNCH_TRANSPOSITION_TABLE_H_
+
+#include <vector>
+
+#include "chess/types.h"
+
+namespace punch {
+
+enum class Bound : uint8_t { kNone, kExact, kLowerBound, kUpperBound };
+
+struct TtEntry {
+  Key key;
+  Move move;
+  int16_t depth;
+  int16_t score;
+  Bound bound;
+  uint8_t age;
+};
+
+inline Value ValueFromTt(Value value, int ply) {
+  if (IsMateValue(value)) {
+    return value > 0 ? value - ply : value + ply;
+  }
+  return value;
+}
+
+inline Value ValueToTt(Value value, int ply) {
+  if (IsMateValue(value)) {
+    return value > 0 ? value + ply : value - ply;
+  }
+  return value;
+}
+
+class TranspositionTable {
+ public:
+  TranspositionTable() = default;
+  TranspositionTable(size_t mb);
+
+  void Resize(size_t mb);
+  void Clear();
+
+  inline TtEntry* Probe(Key key) { return table_.data() + (key & (size_ - 1)); }
+
+  inline void Store(Key key, Move move, int depth, Value score, Bound bound,
+                    uint8_t age, int ply) {
+    TtEntry* entry = Probe(key);
+
+    bool is_old = (age - entry->age) > 2;
+
+    if (entry->key != key || depth >= entry->depth || is_old) {
+      entry->key = key;
+      entry->move = move;
+      entry->depth = static_cast<int16_t>(depth);
+      entry->score = static_cast<int16_t>(ValueToTt(score, ply));
+      entry->bound = bound;
+      entry->age = age;
+    }
+  }
+
+  int Hashfull(uint8_t current_age) const;
+
+ private:
+  std::vector<TtEntry> table_;
+  size_t size_ = 0;
+};
+
+}  // namespace punch
+
+#endif  // PUNCH_TRANSPOSITION_TABLE_H_

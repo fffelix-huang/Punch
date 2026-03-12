@@ -1,0 +1,43 @@
+name: Run Tests
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v3
+      - uses: pre-commit/action@v3.0.1
+
+  unit-test:
+    name: Run Tests (Ubuntu, ${{ matrix.compiler }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+    env:
+      CC: ${{ matrix.compiler == 'clang' && 'clang' || 'gcc'}}
+      CXX: ${{ matrix.compiler == 'clang' && 'clang++' || 'g++'}}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y meson ninja-build
+      - name: Setup Meson
+        run: meson setup build --buildtype=debugoptimized
+      - name: Compile
+        run: meson compile -C build
+      - name: Run All Tests
+        run: |
+          meson test -C build --print-errorlogs
+      - name: Bench Test
+        run: echo "bench\nquit\n" | ./build/punch
