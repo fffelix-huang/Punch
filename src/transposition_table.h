@@ -40,13 +40,15 @@ class TranspositionTable {
   void Resize(size_t mb);
   void Clear();
 
+  inline void NewSearch() { age_++; }
+
   inline TtEntry* Probe(Key key) { return table_.data() + (key & (size_ - 1)); }
 
   inline void Store(Key key, Move move, int depth, Value score, Bound bound,
-                    uint8_t age, int ply) {
+                    int ply) {
     TtEntry* entry = Probe(key);
 
-    bool is_old = (age - entry->age) > 2;
+    bool is_old = (age_ - entry->age) > 2;
 
     if (entry->key != key || depth >= entry->depth || is_old) {
       entry->key = key;
@@ -54,15 +56,16 @@ class TranspositionTable {
       entry->depth = static_cast<int16_t>(depth);
       entry->score = static_cast<int16_t>(ValueToTt(score, ply));
       entry->bound = bound;
-      entry->age = age;
+      entry->age = age_;
     }
   }
 
-  int Hashfull(uint8_t current_age) const;
+  int Hashfull() const;
 
  private:
   std::vector<TtEntry> table_;
   size_t size_ = 0;
+  uint8_t age_ = 0;
 };
 
 }  // namespace punch

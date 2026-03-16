@@ -1,5 +1,5 @@
-#ifndef PUNCH_MOVEPICKER_H_
-#define PUNCH_MOVEPICKER_H_
+#ifndef PUNCH_MOVE_PICKER_H_
+#define PUNCH_MOVE_PICKER_H_
 
 #include <array>
 
@@ -28,4 +28,4 @@ class MovePicker {
 
 }  // namespace punch
 
-#endif  // PUNCH_MOVEPICKER_H_
+#endif  // PUNCH_MOVE_PICKER_H_

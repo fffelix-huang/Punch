@@ -94,33 +94,33 @@ std::pair<std::string, std::vector<std::string>> ParsePosition(
   return {fen, move_strs};
 }
 
-SearchParams ParseGo(std::istringstream& is) {
+SearchLimits ParseGo(std::istringstream& is) {
   std::string token;
-  SearchParams params;
+  SearchLimits limits;
 
   while (is >> token) {
     if (token == "wtime") {
-      is >> params.wtime;
+      is >> limits.wtime;
     } else if (token == "btime") {
-      is >> params.btime;
+      is >> limits.btime;
     } else if (token == "winc") {
-      is >> params.winc;
+      is >> limits.winc;
     } else if (token == "binc") {
-      is >> params.binc;
+      is >> limits.binc;
     } else if (token == "movestogo") {
-      is >> params.movestogo;
+      is >> limits.movestogo;
     } else if (token == "depth") {
-      is >> params.depth_limit;
+      is >> limits.depth_limit;
     } else if (token == "nodes") {
-      is >> params.nodes_limit;
+      is >> limits.nodes_limit;
     } else if (token == "movetime") {
-      is >> params.movetime;
+      is >> limits.movetime;
     } else if (token == "infinite") {
-      params.infinite = true;
+      limits.infinite = true;
     }
   }
 
-  return params;
+  return limits;
 }
 
 }  // namespace punch::uci

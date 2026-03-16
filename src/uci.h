@@ -1,7 +1,7 @@
 #ifndef PUNCH_UCI_H_
 #define PUNCH_UCI_H_
 
-#include <iostream>
+#include <iosfwd>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -16,8 +16,7 @@ namespace punch::uci {
 void Loop();
 std::pair<std::string, std::vector<std::string>> ParsePosition(
     std::istringstream& is);
-SearchParams ParseGo(std::istringstream& is);
-Move ParseMove(const ChessBoard& board, std::string_view move_str);
+SearchLimits ParseGo(std::istringstream& is);
 
 }  // namespace punch::uci
 

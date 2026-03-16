@@ -25,7 +25,7 @@ void TranspositionTable::Resize(size_t mb) {
 
 void TranspositionTable::Clear() { std::ranges::fill(table_, TtEntry{}); }
 
-int TranspositionTable::Hashfull(uint8_t current_age) const {
+int TranspositionTable::Hashfull() const {
   if (size_ == 0) {
     return 0;
   }
@@ -34,7 +34,7 @@ int TranspositionTable::Hashfull(uint8_t current_age) const {
   size_t sample_size = std::min<size_t>(size_, 1000);
 
   for (size_t i = 0; i < sample_size; ++i) {
-    occupied += (table_[i].key != Key(0) && table_[i].age == current_age);
+    occupied += (table_[i].key != Key(0) && table_[i].age == age_);
   }
 
   return (occupied * 1000) / sample_size;

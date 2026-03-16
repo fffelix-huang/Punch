@@ -8,52 +8,35 @@
 #include "chess/movegen.h"
 #include "chess/types.h"
 #include "evaluate.h"
-#include "movepicker.h"
+#include "move_picker.h"
+#include "time_manager.h"
 #include "transposition_table.h"
 
 namespace punch {
 
-std::ostream& operator<<(std::ostream& os, const SearchInfo& info) {
-  auto now = std::chrono::steady_clock::now();
-  auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-                     now - info.start_time)
-                     .count();
+Worker::Worker(TranspositionTable& tt) : tt_(tt) {}
+Worker::~Worker() = default;
 
-  os << "info depth " << info.depth << " seldepth " << info.seldepth
-     << " score " << ValueToString(info.score) << " nodes " << info.nodes
-     << " nps " << (info.nodes * 1000 / (elapsed + 1)) << " hashfull "
-     << info.tt->Hashfull(info.age) << " time " << elapsed;
+Value Worker::QuiescenceSearch(SearchStack* ss, Value alpha, Value beta) {
+  int ply = ss->ply;
+  nodes_++;
+  seldepth_ = std::max(seldepth_, ply);
+  ss->pv_length = 0;
 
-  if (info.pv_length[0] > 0) {
-    os << " pv";
-    for (int i = 0; i < info.pv_length[0]; ++i) {
-      os << " " << info.pv_table[0][i].ToString();
-    }
-  }
+  tm_->CheckTime(*this);
 
-  return os;
-}
-
-Value QuiescenceSearch(ChessBoard& board, SearchInfo& search_info, Value alpha,
-                       Value beta) {
-  int ply = search_info.ply;
-  search_info.nodes++;
-  search_info.seldepth = std::max(search_info.seldepth, search_info.ply);
-  search_info.pv_length[ply] = 0;
-  search_info.UpdateStatus();
-
-  if (search_info.stopped) {
+  if (stopped_) {
     return kValueNone;
   }
 
   // 1. Draw Detection
-  if (ply > 0 && board.IsDraw()) {
+  if (ply > 0 && board_.IsDraw()) {
     return kValueDraw;
   }
 
   // 2. TT Probe
-  Key key = board.GetHashKey();
-  TtEntry* entry = search_info.tt->Probe(key);
+  Key key = board_.GetHashKey();
+  TtEntry* entry = tt_.Probe(key);
   Move tt_move = Move::None();
 
   if (entry->key == key) {
@@ -72,13 +55,13 @@ Value QuiescenceSearch(ChessBoard& board, SearchInfo& search_info, Value alpha,
   }
 
   // 3. Static Evaluation
-  Value static_eval = eval::Evaluate(board);
+  Value static_eval = eval::Evaluate(board_);
   if (static_eval >= beta) {
     return beta;
   }
   alpha = std::max(alpha, static_eval);
 
-  MovePicker<movegen::MoveGenType::kCaptures> picker(board, tt_move);
+  MovePicker<movegen::MoveGenType::kCaptures> picker(board_, tt_move);
 
   if (picker.NumMoves() == 0) {
     return static_eval;
@@ -90,15 +73,13 @@ Value QuiescenceSearch(ChessBoard& board, SearchInfo& search_info, Value alpha,
 
   while ((m = picker.NextMove()) != Move::None()) {
     StateInfo st;
-    board.MakeMove(m, st);
-    search_info.ply++;
+    board_.MakeMove(m, st);
 
-    Value score = -QuiescenceSearch(board, search_info, -beta, -alpha);
+    Value score = -QuiescenceSearch(ss + 1, -beta, -alpha);
 
-    search_info.ply--;
-    board.UnmakeMove(m);
+    board_.UnmakeMove(m);
 
-    if (search_info.stopped) {
+    if (stopped_) {
       return kValueNone;
     }
 
@@ -114,34 +95,33 @@ Value QuiescenceSearch(ChessBoard& board, SearchInfo& search_info, Value alpha,
   }
 
   Bound bound = (best_score >= beta) ? Bound::kLowerBound : Bound::kUpperBound;
-  search_info.tt->Store(key, best_move, 0, best_score, bound, search_info.age,
-                        ply);
+  tt_.Store(key, best_move, 0, best_score, bound, ply);
 
   return best_score;
 }
 
-Value Negamax(ChessBoard& board, SearchInfo& search_info, int depth,
-              Value alpha, Value beta) {
-  int ply = search_info.ply;
-  search_info.nodes++;
-  search_info.seldepth = std::max(search_info.seldepth, ply);
-  search_info.pv_length[ply] = 0;
-  search_info.UpdateStatus();
+Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
+  int ply = ss->ply;
+  nodes_++;
+  seldepth_ = std::max(seldepth_, ply);
+  ss->pv_length = 0;
 
-  if (search_info.stopped) {
+  tm_->CheckTime(*this);
+
+  if (stopped_) {
     return kValueNone;
   }
 
   // 1. Draw Detection
-  if (ply > 0 && board.IsDraw()) {
+  if (ply > 0 && board_.IsDraw()) {
     return kValueDraw;
   }
 
   // 2. TT Probe
   Value original_alpha = alpha;
-  Key key = board.GetHashKey();
+  Key key = board_.GetHashKey();
 
-  TtEntry* entry = search_info.tt->Probe(key);
+  TtEntry* entry = tt_.Probe(key);
   Move tt_move = Move::None();
 
   if (entry->key == key) {
@@ -164,15 +144,15 @@ Value Negamax(ChessBoard& board, SearchInfo& search_info, int depth,
 
   // 3. Quiescence Search
   if (depth <= 0) {
-    return QuiescenceSearch(board, search_info, alpha, beta);
+    return QuiescenceSearch(ss, alpha, beta);
   }
 
   depth = std::min(depth, kMaxPly - 1);
 
-  MovePicker<movegen::MoveGenType::kAll> picker(board, tt_move);
+  MovePicker<movegen::MoveGenType::kAll> picker(board_, tt_move);
 
   if (picker.NumMoves() == 0) {
-    return board.InCheck() ? MatedIn(ply) : kValueDraw;
+    return board_.InCheck() ? MatedIn(ply) : kValueDraw;
   }
 
   Move m;
@@ -181,15 +161,13 @@ Value Negamax(ChessBoard& board, SearchInfo& search_info, int depth,
 
   while ((m = picker.NextMove()) != Move::None()) {
     StateInfo st;
-    board.MakeMove(m, st);
-    search_info.ply++;
+    board_.MakeMove(m, st);
 
-    Value score = -Negamax(board, search_info, depth - 1, -beta, -alpha);
+    Value score = -Negamax(ss + 1, depth - 1, -beta, -alpha);
 
-    search_info.ply--;
-    board.UnmakeMove(m);
+    board_.UnmakeMove(m);
 
-    if (search_info.stopped) {
+    if (stopped_) {
       return kValueNone;
     }
 
@@ -200,17 +178,16 @@ Value Negamax(ChessBoard& board, SearchInfo& search_info, int depth,
       if (score > alpha) {
         alpha = score;
 
-        search_info.pv_table[ply][ply] = m;
-        int next_ply = ply + 1;
-        int next_pv_length = search_info.pv_length[next_ply];
+        ss->pv_line[0] = m;
+        int next_pv_length = (ss + 1)->pv_length;
 
         if (next_pv_length > 0) {
-          std::copy(search_info.pv_table[next_ply] + next_ply,
-                    search_info.pv_table[next_ply] + next_ply + next_pv_length,
-                    search_info.pv_table[ply] + ply + 1);
+          std::copy((ss + 1)->pv_line.begin(),
+                    (ss + 1)->pv_line.begin() + next_pv_length,
+                    ss->pv_line.begin() + 1);
         }
 
-        search_info.pv_length[ply] = next_pv_length + 1;
+        ss->pv_length = next_pv_length + 1;
 
         if (alpha >= beta) {
           break;
@@ -222,41 +199,65 @@ Value Negamax(ChessBoard& board, SearchInfo& search_info, int depth,
   Bound bound = (best_score >= beta)            ? Bound::kLowerBound
                 : (best_score > original_alpha) ? Bound::kExact
                                                 : Bound::kUpperBound;
-  search_info.tt->Store(key, best_move, depth, best_score, bound,
-                        search_info.age, ply);
+  tt_.Store(key, best_move, depth, best_score, bound, ply);
 
   return best_score;
 }
 
-void Search(ChessBoard& board, SearchInfo& search_info) {
-  search_info.Reset();
-
-  if (!search_info.params.infinite) {
-    int64_t time_remaining =
-        (board.SideToMove() == Color::kWhite ? search_info.params.wtime
-                                             : search_info.params.btime);
-    if (time_remaining != -1) {
-      search_info.params.time_limit = time_remaining / 30;
-    }
+void Worker::IterativeDeepening(int depth_limit) {
+  SearchStack ss[kMaxPly + 1];
+  for (int ply = 0; ply < kMaxPly; ++ply) {
+    ss[ply].ply = ply;
   }
 
   Move best_move = Move::None();
 
-  for (int depth = 1; depth <= search_info.params.depth_limit; ++depth) {
-    Value score = Negamax(board, search_info, depth, -kValueInf, kValueInf);
+  for (int depth = 1; depth <= depth_limit; ++depth) {
+    Value score = Negamax(ss, depth, -kValueInf, kValueInf);
 
-    if (search_info.stopped) {
+    if (stopped_) {
       break;
     }
 
-    search_info.depth = depth;
-    search_info.score = score;
-    best_move = search_info.pv_table[0][0];
+    if (ss[0].pv_length > 0) {
+      best_move = ss[0].pv_line[0];
+    }
 
-    std::cout << search_info << std::endl;
+    int64_t elapsed_ms = std::max(tm_->ElapsedMs(), 1LL);
+
+    std::string pv;
+    for (int i = 0; i < ss[0].pv_length; ++i) {
+      pv += ss[0].pv_line[i].ToString() + " ";
+    }
+    if (!pv.empty()) {
+      pv.pop_back();
+    }
+
+    Info info;
+    info.depth = depth;
+    info.seldepth = seldepth_;
+    info.score = score;
+    info.nodes = nodes_;
+    info.time_ms = elapsed_ms;
+    info.nps = (nodes_ * 1000) / elapsed_ms;
+    info.hashfull = tt_.Hashfull();
+    info.pv = pv;
+
+    std::cout << info << std::endl;
   }
 
   std::cout << "bestmove " << best_move.ToString() << std::endl;
+}
+
+void Worker::Search(const ChessBoard& board, const SearchLimits& limits) {
+  board_ = board;
+  tm_ = std::make_unique<TimeManager>(std::move(limits), board_.SideToMove());
+
+  nodes_ = 0;
+  seldepth_ = 0;
+  stopped_ = false;
+
+  IterativeDeepening(limits.depth_limit);
 }
 
 }  // namespace punch

@@ -1,7 +1,7 @@
 #ifndef PUNCH_ENGINE_H_
 #define PUNCH_ENGINE_H_
 
-#include <deque>
+#include <memory>
 #include <span>
 #include <string>
 #include <string_view>
@@ -23,8 +23,9 @@ class Engine {
   void NewGame();
   void SetPosition(std::string_view fen,
                    std::span<const std::string> move_strs);
-  void StartSearch(SearchParams&& params);
+  void StartSearch(SearchLimits limits);
   void StopSearch();
+  void WaitForSearch();
   void Quit();
 
   void Bench(size_t mb = 16);
@@ -34,14 +35,13 @@ class Engine {
 
  private:
   void JoinThread();
-  void PrepareSearch(SearchParams&& params);
 
   ChessBoard board_;
-  SearchInfo search_info_;
-  TranspositionTable tt_;
   std::deque<StateInfo> states_pool_;
-  std::thread search_thread_;
+  TranspositionTable tt_;
   OptionManager options_;
+  std::thread search_thread_;
+  std::unique_ptr<Worker> worker_;
 };
 
 }  // namespace punch

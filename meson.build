@@ -22,8 +22,9 @@ files += [
   'src/chess/perft.cc',
   'src/engine.cc',
   'src/evaluate.cc',
-  'src/movepicker.cc',
+  'src/move_picker.cc',
   'src/search.cc',
+  'src/time_manager.cc',
   'src/transposition_table.cc',
   'src/uci.cc'
 ]

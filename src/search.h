@@ -3,6 +3,8 @@
 
 #include <atomic>
 #include <chrono>
+#include <deque>
+#include <iosfwd>
 
 #include "chess/board.h"
 #include "chess/types.h"
@@ -10,7 +12,14 @@
 
 namespace punch {
 
-struct SearchParams {
+struct SearchStack {
+  int ply;
+
+  std::array<Move, kMaxPly> pv_line;
+  int pv_length;
+};
+
+struct SearchLimits {
   int64_t wtime = -1;
   int64_t btime = -1;
   int64_t winc = 0;
@@ -23,67 +32,55 @@ struct SearchParams {
   bool infinite = false;
 };
 
-struct SearchInfo {
-  SearchParams params;
-  TranspositionTable* tt;
-  uint8_t age = 0;
+struct Info {
+  int depth;
+  int seldepth;
+  Value score;
+  uint64_t nodes;
+  int nps;
+  int hashfull;
+  int time_ms;
+  std::string_view pv;
 
-  uint64_t nodes = 0;
-  int ply = 0;
-  int depth = 0;
-  int seldepth = 0;
-  Value score = 0;
-  Move pv_table[kMaxPly][kMaxPly];
-  int pv_length[kMaxPly];
+  friend std::ostream& operator<<(std::ostream& os, const Info& info) {
+    os << "info depth " << info.depth << " seldepth " << info.seldepth
+       << " score " << ValueToString(info.score) << " nodes " << info.nodes
+       << " hashfull " << info.hashfull << " time " << info.time_ms;
 
-  std::chrono::steady_clock::time_point start_time;
-  std::atomic_bool stopped{false};
-
-  void Apply(SearchParams&& search_params) {
-    params = std::move(search_params);
-  }
-
-  void Reset() {
-    start_time = std::chrono::steady_clock::now();
-    nodes = 0;
-    depth = 0;
-    seldepth = 0;
-    score = 0;
-    stopped = false;
-
-    for (int i = 0; i < kMaxPly; ++i) {
-      pv_length[i] = 0;
-      for (int j = 0; j < kMaxPly; ++j) {
-        pv_table[i][j] = Move::None();
-      }
+    if (!info.pv.empty()) {
+      os << " pv " << info.pv;
     }
-  }
 
-  void UpdateStatus() {
-    if (params.nodes_limit > 0 && nodes >= params.nodes_limit) {
-      stopped = true;
-    }
-    if (!params.infinite && params.time_limit != -1 && (nodes & 2047) == 0) {
-      auto now = std::chrono::steady_clock::now();
-      auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-                         now - start_time)
-                         .count();
-      if (elapsed >= params.time_limit) {
-        stopped = true;
-      }
-    }
+    return os;
   }
-
-  friend std::ostream& operator<<(std::ostream& os,
-                                  const SearchInfo& search_info);
 };
 
-Value QuiescenceSearch(ChessBoard& board, SearchInfo& search_info, Value alpha,
-                       Value beta);
-Value Negamax(ChessBoard& board, SearchInfo& search_info, int depth,
-              Value alpha, Value beta);
+class TimeManager;
 
-void Search(ChessBoard& board, SearchInfo& search_info);
+class Worker {
+ public:
+  Worker(TranspositionTable& tt);
+  ~Worker();
+
+  inline void Stop() { stopped_.store(true, std::memory_order_relaxed); }
+
+  void Search(const ChessBoard& board, const SearchLimits& limits);
+  void IterativeDeepening(int depth_limit = kMaxPly);
+  Value Negamax(SearchStack* ss, int depth, Value alpha, Value beta);
+  Value QuiescenceSearch(SearchStack* ss, Value alpha, Value beta);
+
+  constexpr uint64_t NodesSearched() const { return nodes_; }
+
+ private:
+  ChessBoard board_;
+  TranspositionTable& tt_;
+  SearchLimits limits_;
+  std::unique_ptr<TimeManager> tm_;
+
+  uint64_t nodes_;
+  int seldepth_;
+  std::atomic_bool stopped_{false};
+};
 
 }  // namespace punch
 

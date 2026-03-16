@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <iostream>
+#include <memory>
 #include <span>
 #include <string>
 #include <string_view>
@@ -14,25 +15,21 @@
 namespace punch {
 
 Engine::Engine() {
-  search_info_.tt = &tt_;
+  worker_ = std::make_unique<Worker>(tt_);
 
-  NewGame();
+  board_.LoadFen(kInitialFen);
 
   options_.Add(std::make_unique<SpinOption>(
       "Hash", 16, 1, 1024, [this](int mb_size) { tt_.Resize(mb_size); }));
-  options_.Add(std::make_unique<ButtonOption>("Clear Hash", [this]() {
-    tt_.Clear();
-    search_info_.age = 0;
-  }));
+  options_.Add(
+      std::make_unique<ButtonOption>("Clear Hash", [this]() { tt_.Clear(); }));
 }
 
 Engine::~Engine() { JoinThread(); }
 
 void Engine::JoinThread() {
-  search_info_.stopped = true;
-  if (search_thread_.joinable()) {
-    search_thread_.join();
-  }
+  worker_->Stop();
+  WaitForSearch();
 }
 
 void Engine::NewGame() {
@@ -40,7 +37,6 @@ void Engine::NewGame() {
   states_pool_.clear();
   board_.LoadFen(kInitialFen);
   tt_.Clear();
-  search_info_.age = 0;
 }
 
 void Engine::SetPosition(std::string_view fen,
@@ -72,22 +68,20 @@ void Engine::SetPosition(std::string_view fen,
   }
 }
 
-void Engine::PrepareSearch(SearchParams&& params) {
-  search_info_.Apply(std::move(params));
-  search_info_.age++;
-  search_info_.Reset();
-}
-
-void Engine::StartSearch(SearchParams&& params) {
+void Engine::StartSearch(SearchLimits limits) {
   JoinThread();
-  PrepareSearch(std::move(params));
-  search_thread_ =
-      std::thread(Search, std::ref(board_), std::ref(search_info_));
+  search_thread_ = std::thread(&Worker::Search, worker_.get(), board_, limits);
 }
 
 void Engine::StopSearch() { JoinThread(); }
 
 void Engine::Quit() { JoinThread(); }
+
+void Engine::WaitForSearch() {
+  if (search_thread_.joinable()) {
+    search_thread_.join();
+  }
+}
 
 void Engine::Bench(size_t mb) {
   constexpr int kBenchDepth = 6;
@@ -96,7 +90,6 @@ void Engine::Bench(size_t mb) {
 
   tt_.Resize(mb);
   tt_.Clear();
-  search_info_.age = 0;
 
   const size_t num_positions = bench::kBenchPositions.size();
   uint64_t total_nodes = 0;
@@ -107,14 +100,13 @@ void Engine::Bench(size_t mb) {
     std::cout << "Position: " << (i + 1) << "/" << num_positions << " (" << fen
               << ")" << std::endl;
 
-    SetPosition(fen, {});
     board_.LoadFen(fen);
-    states_pool_.clear();
+    tt_.NewSearch();
 
-    PrepareSearch(SearchParams{.depth_limit = kBenchDepth});
-    Search(board_, search_info_);
+    StartSearch(SearchLimits{.depth_limit = kBenchDepth});
+    WaitForSearch();
 
-    total_nodes += search_info_.nodes;
+    total_nodes += worker_->NodesSearched();
 
     std::cout << std::endl;
   }
