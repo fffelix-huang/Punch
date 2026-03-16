@@ -61,7 +61,7 @@ Value Worker::QuiescenceSearch(SearchStack* ss, Value alpha, Value beta) {
   }
   alpha = std::max(alpha, static_eval);
 
-  MovePicker<movegen::MoveGenType::kCaptures> picker(board_, tt_move);
+  MovePicker<movegen::MoveGenType::kCaptures> picker(board_, ss, tt_move);
 
   if (picker.NumMoves() == 0) {
     return static_eval;
@@ -149,7 +149,7 @@ Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
 
   depth = std::min(depth, kMaxPly - 1);
 
-  MovePicker<movegen::MoveGenType::kAll> picker(board_, tt_move);
+  MovePicker<movegen::MoveGenType::kAll> picker(board_, ss, tt_move);
 
   if (picker.NumMoves() == 0) {
     return board_.InCheck() ? MatedIn(ply) : kValueDraw;
@@ -190,6 +190,12 @@ Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
         ss->pv_length = next_pv_length + 1;
 
         if (alpha >= beta) {
+          if (!board_.IsCapture(m)) {
+            if (m != ss->killers[0]) {
+              ss->killers[1] = ss->killers[0];
+              ss->killers[0] = m;
+            }
+          }
           break;
         }
       }
@@ -223,7 +229,7 @@ void Worker::IterativeDeepening(int depth_limit) {
       best_move = ss[0].pv_line[0];
     }
 
-    int64_t elapsed_ms = std::max(tm_->ElapsedMs(), 1LL);
+    int64_t elapsed_ms = std::max<int64_t>(tm_->ElapsedMs(), 1);
 
     std::string pv;
     for (int i = 0; i < ss[0].pv_length; ++i) {

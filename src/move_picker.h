@@ -9,14 +9,17 @@
 
 namespace punch {
 
+struct SearchStack;
+
 template <movegen::MoveGenType T>
 class MovePicker {
  public:
-  MovePicker(const ChessBoard& board, Move tt_move);
+  MovePicker(const ChessBoard& board, SearchStack* ss, Move tt_move);
 
   Move NextMove();
 
-  inline int ScoreMove(const ChessBoard& board, Move m, Move tt_move) const;
+  inline int ScoreMove(const ChessBoard& board, SearchStack* ss, Move m,
+                       Move tt_move) const;
 
   inline size_t NumMoves() const { return moves.size(); }
 

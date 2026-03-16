@@ -14,6 +14,7 @@ namespace punch {
 
 struct SearchStack {
   int ply;
+  std::array<Move, 2> killers = {Move::None(), Move::None()};
 
   std::array<Move, kMaxPly> pv_line;
   int pv_length;
