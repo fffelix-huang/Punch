@@ -101,6 +101,7 @@ Value Worker::QuiescenceSearch(SearchStack* ss, Value alpha, Value beta) {
 }
 
 Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
+  Color us = board_.SideToMove();
   int ply = ss->ply;
   nodes_++;
   seldepth_ = std::max(seldepth_, ply);
@@ -142,7 +143,29 @@ Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
     }
   }
 
-  // 3. Quiescence Search
+  // 3. Null Move Pruning
+  Bitboard non_pawn_materials =
+      board_.Us(us) & (~board_.Pieces(PieceType::kPawn, us));
+  if (depth >= 3 && !board_.InCheck() && PopCount(non_pawn_materials) > 0) {
+    const int R = 2 + depth / 3;
+
+    StateInfo st;
+    board_.MakeNullMove(st);
+
+    Value score = -Negamax(ss + 1, depth - 1 - R, -beta, -beta + 1);
+
+    board_.UnmakeNullMove();
+
+    if (stopped_) {
+      return kValueNone;
+    }
+
+    if (score >= beta) {
+      return score;
+    }
+  }
+
+  // 4. Quiescence Search
   if (depth <= 0) {
     return QuiescenceSearch(ss, alpha, beta);
   }
