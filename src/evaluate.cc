@@ -2,6 +2,7 @@
 
 #include <array>
 
+#include "chess/attacks.h"
 #include "chess/bitboard.h"
 #include "chess/board.h"
 #include "chess/types.h"
@@ -89,6 +90,22 @@ Value Evaluate(const ChessBoard& board) {
       }
     }
 
+    coeff *= -1;
+  }
+
+  // King Zone Attack Bonus
+  for (Color c : {us, ~us}) {
+    Square opp_king_sq = board.KingSquare(~c);
+    Bitboard king_zone_bb =
+        attacks::GetKingAttacks(opp_king_sq) | SquareToBitboard(opp_king_sq);
+
+    int attack_count = 0;
+    while (king_zone_bb) {
+      Square sq = PopLsb(king_zone_bb);
+      attack_count += board.IsAttacked(sq, c);
+    }
+
+    score += coeff * attack_count * attack_count * 10;
     coeff *= -1;
   }
 
