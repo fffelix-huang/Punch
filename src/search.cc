@@ -241,8 +241,42 @@ void Worker::IterativeDeepening(int depth_limit) {
 
   Move best_move = Move::None();
 
+  Value alpha = -kValueInf;
+  Value beta = kValueInf;
+  Value delta = 40;
+
   for (int depth = 1; depth <= depth_limit; ++depth) {
-    Value score = Negamax(ss, depth, -kValueInf, kValueInf);
+    int fail_count = 0;
+    Value score;
+
+    // Aspiration Window
+    while (true) {
+      score = Negamax(ss, depth, alpha, beta);
+
+      if (stopped_) {
+        break;
+      }
+
+      if (score <= alpha) {
+        beta = (alpha + beta) / 2;
+        alpha = std::max(score - delta, -kValueInf);
+        delta += delta / 2;
+      } else if (score >= delta) {
+        alpha = (alpha + beta) / 2;
+        beta = std::min(score + delta, kValueInf);
+        delta += delta / 2;
+      } else {
+        delta = 40;
+        alpha = std::max(score - delta, -kValueInf);
+        beta = std::min(score + delta, kValueInf);
+        break;
+      }
+
+      if (++fail_count > 3) {
+        alpha = -kValueInf;
+        beta = kValueInf;
+      }
+    }
 
     if (stopped_) {
       break;
