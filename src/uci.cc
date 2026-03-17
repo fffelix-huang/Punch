@@ -15,8 +15,14 @@
 
 namespace punch::uci {
 
-void Loop() {
+void Loop(int argc, char* argv[]) {
   Engine engine;
+
+  if (argc > 1 && std::string_view(argv[1]) == "bench") {
+    engine.Bench();
+    return;
+  }
+
   std::string line, token;
 
   while (std::getline(std::cin, line)) {

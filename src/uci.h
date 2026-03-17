@@ -3,7 +3,6 @@
 
 #include <iosfwd>
 #include <string>
-#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -13,7 +12,7 @@
 
 namespace punch::uci {
 
-void Loop();
+void Loop(int argc, char* argv[]);
 std::pair<std::string, std::vector<std::string>> ParsePosition(
     std::istringstream& is);
 SearchLimits ParseGo(std::istringstream& is);
