@@ -19,6 +19,7 @@ Engine::Engine() {
 
   board_.LoadFen(kInitialFen);
 
+  options_.Add(std::make_unique<SpinOption>("Threads", 1, 1, 1));
   options_.Add(std::make_unique<SpinOption>(
       "Hash", 16, 1, 1024, [this](int mb_size) { tt_.Resize(mb_size); }));
   options_.Add(
