@@ -26,6 +26,7 @@ void Worker::Clear() {
 }
 
 Value Worker::QuiescenceSearch(SearchStack* ss, Value alpha, Value beta) {
+  const bool root_node = (ss->ply == 0);
   int ply = ss->ply;
   nodes_++;
   seldepth_ = std::max(seldepth_, ply);
@@ -38,7 +39,7 @@ Value Worker::QuiescenceSearch(SearchStack* ss, Value alpha, Value beta) {
   }
 
   // 1. Draw Detection
-  if (ply > 0 && board_.IsDraw()) {
+  if (!root_node && board_.IsDraw()) {
     return kValueDraw;
   }
 
@@ -111,6 +112,7 @@ Value Worker::QuiescenceSearch(SearchStack* ss, Value alpha, Value beta) {
 
 Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
   const Color us = board_.SideToMove();
+  const bool root_node = (ss->ply == 0);
   int ply = ss->ply;
   nodes_++;
   seldepth_ = std::max(seldepth_, ply);
@@ -123,9 +125,11 @@ Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
   }
 
   // 1. Draw Detection
-  if (ply > 0 && board_.IsDraw()) {
+  if (!root_node && board_.IsDraw()) {
     return kValueDraw;
   }
+
+  Value eval = eval::Evaluate(board_);
 
   // 2. TT Probe
   const Value original_alpha = alpha;
@@ -136,10 +140,9 @@ Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
 
   if (entry->key == key) {
     tt_move = entry->move;
+    Value tt_score = ValueFromTt(entry->score, ply);
 
-    if (entry->depth >= depth && ply > 0) {
-      Value tt_score = ValueFromTt(entry->score, ply);
-
+    if (entry->depth >= depth && !root_node) {
       if (entry->bound == Bound::kExact) {
         return tt_score;
       }
@@ -150,12 +153,24 @@ Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
         return tt_score;
       }
     }
+
+    if (tt_score != kValueNone) {
+      if (entry->bound == Bound::kExact) {
+        eval = tt_score;
+      }
+      if (entry->bound == Bound::kLowerBound && tt_score > eval) {
+        eval = tt_score;
+      }
+      if (entry->bound == Bound::kUpperBound && tt_score < eval) {
+        eval = tt_score;
+      }
+    }
   }
 
   // 3. Null Move Pruning
   Bitboard non_pawn_materials =
       board_.Us(us) & (~board_.Pieces(PieceType::kPawn, us));
-  if (depth >= 3 && !board_.InCheck() && PopCount(non_pawn_materials) > 0) {
+  if (depth >= 3 && !board_.InCheck() && non_pawn_materials > 0) {
     const int R = 2 + depth / 3;
 
     StateInfo st;
@@ -191,8 +206,23 @@ Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
   Move m;
   Move best_move = Move::None();
   Value best_score = -kValueInf;
+  int move_count = 0;
 
   while ((m = picker.NextMove()) != Move::None()) {
+    ++move_count;
+    bool is_quiet = !board_.InCheck() && !board_.IsCapture(m) &&
+                    m.TypeOf() != MoveType::kPromotion;
+
+    // 5. Futility Pruning
+    if (!root_node && move_count > 1 && non_pawn_materials > 0) {
+      Value futility_margin = 110 + depth * 70;
+
+      if (depth <= std::max(move_count / 4, 1) && is_quiet &&
+          eval + futility_margin < alpha) {
+        continue;
+      }
+    }
+
     StateInfo st;
     board_.MakeMove(m, st);
 
