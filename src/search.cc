@@ -167,7 +167,16 @@ Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
     }
   }
 
-  // 3. Null Move Pruning
+  // 3. Reverse Futility Pruning
+  if (!root_node && !board_.InCheck() && depth <= 5) {
+    Value rfp_margin = depth * 75;
+
+    if (eval - rfp_margin >= beta) {
+      return (eval + beta) / 2;
+    }
+  }
+
+  // 4. Null Move Pruning
   Bitboard non_pawn_materials =
       board_.Us(us) & (~board_.Pieces(PieceType::kPawn, us));
   if (depth >= 3 && !board_.InCheck() && non_pawn_materials > 0) {
@@ -189,7 +198,7 @@ Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
     }
   }
 
-  // 4. Quiescence Search
+  // 5. Quiescence Search
   if (depth <= 0) {
     return QuiescenceSearch(ss, alpha, beta);
   }
@@ -213,7 +222,7 @@ Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
     bool is_quiet = !board_.InCheck() && !board_.IsCapture(m) &&
                     m.TypeOf() != MoveType::kPromotion;
 
-    // 5. Futility Pruning
+    // 6. Futility Pruning
     if (!root_node && move_count > 1 && non_pawn_materials > 0) {
       Value futility_margin = 110 + depth * 70;
 
