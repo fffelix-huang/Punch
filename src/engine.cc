@@ -38,6 +38,7 @@ void Engine::NewGame() {
   states_pool_.clear();
   board_.LoadFen(kInitialFen);
   tt_.Clear();
+  worker_->Clear();
 }
 
 void Engine::SetPosition(std::string_view fen,

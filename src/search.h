@@ -1,6 +1,7 @@
 #ifndef PUNCH_SEARCH_H_
 #define PUNCH_SEARCH_H_
 
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <deque>
@@ -63,6 +64,8 @@ class Worker {
   Worker(TranspositionTable& tt);
   ~Worker();
 
+  void Clear();
+
   inline void Stop() { stopped_.store(true, std::memory_order_relaxed); }
 
   void Search(const ChessBoard& board, const SearchLimits& limits);
@@ -77,6 +80,11 @@ class Worker {
   TranspositionTable& tt_;
   SearchLimits limits_;
   std::unique_ptr<TimeManager> tm_;
+
+  std::array<
+      std::array<std::array<int16_t, Square::kSquareNb>, Square::kSquareNb>,
+      Color::kColorNb>
+      move_history_;
 
   uint64_t nodes_;
   int seldepth_;

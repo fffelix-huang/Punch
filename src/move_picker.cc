@@ -10,11 +10,14 @@
 namespace punch {
 
 template <movegen::MoveGenType T>
-MovePicker<T>::MovePicker(const ChessBoard& board, SearchStack* ss,
-                          Move tt_move) {
+MovePicker<T>::MovePicker(
+    const ChessBoard& board, SearchStack* ss, Move tt_move,
+    const std::array<
+        std::array<std::array<int16_t, Square::kSquareNb>, Square::kSquareNb>,
+        Color::kColorNb>& move_history) {
   movegen::GenerateLegalMoves<T>(board, moves);
   for (size_t i = 0; i < moves.size(); ++i) {
-    scores[i] = ScoreMove(board, ss, moves[i], tt_move);
+    scores[i] = ScoreMove(board, ss, moves[i], tt_move, move_history);
   }
 }
 
@@ -34,10 +37,15 @@ Move MovePicker<T>::NextMove() {
 }
 
 template <movegen::MoveGenType T>
-int MovePicker<T>::ScoreMove(const ChessBoard& board, SearchStack* ss, Move m,
-                             Move tt_move) const {
+int MovePicker<T>::ScoreMove(
+    const ChessBoard& board, SearchStack* ss, Move m, Move tt_move,
+    const std::array<
+        std::array<std::array<int16_t, Square::kSquareNb>, Square::kSquareNb>,
+        Color::kColorNb>& move_history) const {
   // kNoPieceType, kPawn, kKnight, kBishop, kRook, kQueen, kKing,
   static constexpr int kPieceValues[] = {0, 100, 290, 310, 500, 900, 0};
+
+  const Color us = board.SideToMove();
 
   int score = 0;
 
@@ -69,6 +77,8 @@ int MovePicker<T>::ScoreMove(const ChessBoard& board, SearchStack* ss, Move m,
     Piece victim = board.PieceOn(m.ToSquare());
     score += 80000000 + (kPieceValues[TypeOf(victim)] * 10) -
              kPieceValues[TypeOf(attacker)];
+  } else {
+    score += move_history[us][m.FromSquare()][m.ToSquare()];
   }
 
   if (m == ss->killers[0]) {

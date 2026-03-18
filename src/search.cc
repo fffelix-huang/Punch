@@ -17,6 +17,14 @@ namespace punch {
 Worker::Worker(TranspositionTable& tt) : tt_(tt) {}
 Worker::~Worker() = default;
 
+void Worker::Clear() {
+  for (auto& c : move_history_) {
+    for (auto& f : c) {
+      f.fill(0);
+    }
+  }
+}
+
 Value Worker::QuiescenceSearch(SearchStack* ss, Value alpha, Value beta) {
   int ply = ss->ply;
   nodes_++;
@@ -61,7 +69,8 @@ Value Worker::QuiescenceSearch(SearchStack* ss, Value alpha, Value beta) {
   }
   alpha = std::max(alpha, static_eval);
 
-  MovePicker<movegen::MoveGenType::kCaptures> picker(board_, ss, tt_move);
+  MovePicker<movegen::MoveGenType::kCaptures> picker(board_, ss, tt_move,
+                                                     move_history_);
 
   if (picker.NumMoves() == 0) {
     return static_eval;
@@ -101,7 +110,7 @@ Value Worker::QuiescenceSearch(SearchStack* ss, Value alpha, Value beta) {
 }
 
 Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
-  Color us = board_.SideToMove();
+  const Color us = board_.SideToMove();
   int ply = ss->ply;
   nodes_++;
   seldepth_ = std::max(seldepth_, ply);
@@ -119,8 +128,8 @@ Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
   }
 
   // 2. TT Probe
-  Value original_alpha = alpha;
-  Key key = board_.GetHashKey();
+  const Value original_alpha = alpha;
+  const Key key = board_.GetHashKey();
 
   TtEntry* entry = tt_.Probe(key);
   Move tt_move = Move::None();
@@ -172,7 +181,8 @@ Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
 
   depth = std::min(depth, kMaxPly - 1);
 
-  MovePicker<movegen::MoveGenType::kAll> picker(board_, ss, tt_move);
+  MovePicker<movegen::MoveGenType::kAll> picker(board_, ss, tt_move,
+                                                move_history_);
 
   if (picker.NumMoves() == 0) {
     return board_.InCheck() ? MatedIn(ply) : kValueDraw;
@@ -214,10 +224,14 @@ Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
 
         if (alpha >= beta) {
           if (!board_.IsCapture(m)) {
+            // Update Killer Moves
             if (m != ss->killers[0]) {
               ss->killers[1] = ss->killers[0];
               ss->killers[0] = m;
             }
+
+            // Update Move History Heuristic
+            move_history_[us][m.FromSquare()][m.ToSquare()] += depth * depth;
           }
           break;
         }
@@ -234,9 +248,19 @@ Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
 }
 
 void Worker::IterativeDeepening(int depth_limit) {
+  // Initialize Search Stack
   SearchStack ss[kMaxPly + 1];
   for (int ply = 0; ply < kMaxPly; ++ply) {
     ss[ply].ply = ply;
+  }
+
+  // Apply aging to move history heuristic
+  for (int c = 0; c < Color::kColorNb; ++c) {
+    for (int from = 0; from < Square::kSquareNb; ++from) {
+      for (int to = 0; to < Square::kSquareNb; ++to) {
+        move_history_[c][from][to] /= 2;
+      }
+    }
   }
 
   Move best_move = Move::None();
