@@ -124,14 +124,23 @@ Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
     return kValueNone;
   }
 
-  // 1. Draw Detection
-  if (!root_node && board_.IsDraw()) {
-    return kValueDraw;
+  if (!root_node) {
+    // 1. Draw Detection
+    if (board_.IsDraw()) {
+      return kValueDraw;
+    }
+
+    // 2. Mate Distance Pruning
+    alpha = std::max(MatedIn(ply), alpha);
+    beta = std::min(MateIn(ply + 1), beta);
+    if (alpha >= beta) {
+      return alpha;
+    }
   }
 
   Value eval = eval::Evaluate(board_);
 
-  // 2. TT Probe
+  // 3. TT Probe
   const Value original_alpha = alpha;
   const Key key = board_.GetHashKey();
 
@@ -167,7 +176,7 @@ Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
     }
   }
 
-  // 3. Reverse Futility Pruning
+  // 4. Reverse Futility Pruning
   if (!root_node && depth <= 5 && !board_.InCheck()) {
     Value rfp_margin = depth * 75;
 
@@ -176,7 +185,7 @@ Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
     }
   }
 
-  // 4. Null Move Pruning
+  // 5. Null Move Pruning
   Bitboard non_pawn_materials =
       board_.Us(us) & (~board_.Pieces(PieceType::kPawn, us));
   if (depth >= 3 && non_pawn_materials > 0 && !board_.InCheck()) {
@@ -198,7 +207,7 @@ Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
     }
   }
 
-  // 5. Quiescence Search
+  // 6. Quiescence Search
   if (depth <= 0) {
     return QuiescenceSearch(ss, alpha, beta);
   }
@@ -224,7 +233,7 @@ Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
                     m.TypeOf() != MoveType::kPromotion;
 
     if (!root_node) {
-      // 6. Late Move Pruning
+      // 7. Late Move Pruning
       if (depth <= 2 && is_quiet) {
         int lmp_threshold = 3 + 3 * depth * depth;
         if (move_count > lmp_threshold) {
@@ -232,7 +241,7 @@ Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
         }
       }
 
-      // 7. Futility Pruning
+      // 8. Futility Pruning
       if (move_count > 1 && non_pawn_materials > 0 && is_quiet) {
         Value futility_margin = 110 + depth * 70;
 
