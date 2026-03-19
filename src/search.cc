@@ -142,7 +142,7 @@ Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
     tt_move = entry->move;
     Value tt_score = ValueFromTt(entry->score, ply);
 
-    if (entry->depth >= depth && !root_node) {
+    if (!root_node && entry->depth >= depth) {
       if (entry->bound == Bound::kExact) {
         return tt_score;
       }
@@ -220,16 +220,26 @@ Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
   while ((m = picker.NextMove()) != Move::None()) {
     ++move_count;
 
-    // 6. Futility Pruning
-    if (!root_node && move_count > 1 && non_pawn_materials > 0) {
-      Value futility_margin = 110 + depth * 70;
+    bool is_quiet = !board_.InCheck() && !board_.IsCapture(m) &&
+                    m.TypeOf() != MoveType::kPromotion;
 
-      bool is_quiet = !board_.InCheck() && !board_.IsCapture(m) &&
-                      m.TypeOf() != MoveType::kPromotion;
+    if (!root_node) {
+      // 6. Late Move Pruning
+      if (depth <= 2 && is_quiet) {
+        int lmp_threshold = 3 + 3 * depth * depth;
+        if (move_count > lmp_threshold) {
+          continue;
+        }
+      }
 
-      if (depth <= std::max(move_count / 4, 1) &&
-          eval + futility_margin < alpha && is_quiet) {
-        continue;
+      // 7. Futility Pruning
+      if (move_count > 1 && non_pawn_materials > 0 && is_quiet) {
+        Value futility_margin = 110 + depth * 70;
+
+        if (depth <= std::max(move_count / 4, 1) &&
+            eval + futility_margin < alpha) {
+          continue;
+        }
       }
     }
 

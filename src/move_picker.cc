@@ -47,47 +47,44 @@ int MovePicker<T>::ScoreMove(
 
   const Color us = board.SideToMove();
 
-  int score = 0;
-
+  // 1. TT Move
   if (m == tt_move) {
-    score += 100000000;
+    return 100000000;
   }
 
+  // 2. Promotions
   if (m.TypeOf() == MoveType::kPromotion) {
     switch (m.PromotionType()) {
       case PieceType::kQueen:
-        score += 90000001;
-        break;
+        return 90000001;
       case PieceType::kKnight:
-        score += 90000000;
-        break;
+        return 90000000;
       case PieceType::kBishop:
-        score -= 90000000;
-        break;
+        return -90000000;
       case PieceType::kRook:
-        score -= 90000001;
-        break;
+        return -90000001;
       default:
         __builtin_unreachable();
     }
   }
 
+  // 3. Captures
   if (board.IsCapture(m)) {
     Piece attacker = board.PieceOn(m.FromSquare());
     Piece victim = board.PieceOn(m.ToSquare());
-    score += 80000000 + (kPieceValues[TypeOf(victim)] * 10) -
-             kPieceValues[TypeOf(attacker)];
-  } else {
-    score += move_history[us][m.FromSquare()][m.ToSquare()];
+    return 80000000 + (kPieceValues[TypeOf(victim)] * 10) -
+           kPieceValues[TypeOf(attacker)];
   }
 
+  // 4. Killer Moves
   if (m == ss->killers[0]) {
-    score += 70000001;
+    return 70000001;
   } else if (m == ss->killers[1]) {
-    score += 70000000;
+    return 70000000;
   }
 
-  return score;
+  // 5. Quiet History Moves
+  return move_history[us][m.FromSquare()][m.ToSquare()];
 }
 
 template class MovePicker<movegen::MoveGenType::kAll>;
