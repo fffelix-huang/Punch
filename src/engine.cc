@@ -87,7 +87,7 @@ void Engine::WaitForSearch() {
 }
 
 void Engine::Bench(size_t mb) {
-  constexpr int kBenchDepth = 7;
+  constexpr int kBenchDepth = 10;
 
   JoinThread();
 

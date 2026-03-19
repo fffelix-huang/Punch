@@ -252,10 +252,25 @@ Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
       }
     }
 
+    // 9. Late Move Reduction
+    int reduction = 0;
+    if (depth >= 3 && move_count > 1 && is_quiet) {
+      reduction += depth / 5 + move_count / 10;
+      reduction = std::clamp(reduction, 0, depth - 1);
+    }
+
     StateInfo st;
     board_.MakeMove(m, st);
 
-    Value score = -Negamax(ss + 1, depth - 1, -beta, -alpha);
+    Value score;
+    if (reduction > 0) {
+      score = -Negamax(ss + 1, depth - 1 - reduction, -alpha - 1, -alpha);
+      if (score > alpha) {
+        score = -Negamax(ss + 1, depth - 1, -beta, -alpha);
+      }
+    } else {
+      score = -Negamax(ss + 1, depth - 1, -beta, -alpha);
+    }
 
     board_.UnmakeMove(m);
 
