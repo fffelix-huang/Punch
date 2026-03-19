@@ -369,6 +369,111 @@ Bitboard ChessBoard::Checkers() const noexcept {
   return checkers;
 }
 
+bool ChessBoard::GivesCheck(Move m) const noexcept {
+  Square from = m.FromSquare();
+  Square to = m.ToSquare();
+  Color us = side_to_move_;
+  Color them = ~us;
+  Square ksq = KingSquare(them);
+  Bitboard occ = Occupied();
+  Bitboard from_bb = SquareToBitboard(from);
+  Bitboard to_bb = SquareToBitboard(to);
+  Bitboard ksq_bb = SquareToBitboard(ksq);
+  MoveType mt = m.TypeOf();
+
+  Bitboard next_occ = (occ ^ from_bb) | to_bb;
+
+  Square rfrom = Square::kNone;
+  Square rto = Square::kNone;
+
+  // Castling
+  if (mt == MoveType::kCastling) {
+    if (to == Square::kG1) {
+      rfrom = Square::kH1;
+      rto = Square::kF1;
+    } else if (to == Square::kC1) {
+      rfrom = Square::kA1;
+      rto = Square::kD1;
+    } else if (to == Square::kG8) {
+      rfrom = Square::kH8;
+      rto = Square::kF8;
+    } else if (to == Square::kC8) {
+      rfrom = Square::kA8;
+      rto = Square::kD8;
+    } else {
+      __builtin_unreachable();
+    }
+
+    next_occ ^= SquareToBitboard(rfrom) | SquareToBitboard(rto);
+  }
+
+  // En Passant
+  if (mt == MoveType::kEnPassant) {
+    next_occ ^= SquareToBitboard(to - PawnDirection(us));
+  }
+
+  PieceType pt =
+      (mt == MoveType::kPromotion) ? m.PromotionType() : TypeOf(PieceOn(from));
+
+  // Direct Check
+  switch (pt) {
+    case PieceType::kPawn:
+      if (attacks::GetPawnAttacks(to, us) & ksq_bb) {
+        return true;
+      }
+      break;
+    case PieceType::kKnight:
+      if (attacks::GetKnightAttacks(to) & ksq_bb) {
+        return true;
+      }
+      break;
+    case PieceType::kBishop:
+      if (attacks::GetBishopAttacks(to, next_occ) & ksq_bb) {
+        return true;
+      }
+      break;
+    case PieceType::kRook:
+      if (attacks::GetRookAttacks(to, next_occ) & ksq_bb) {
+        return true;
+      }
+      break;
+    case PieceType::kQueen:
+      if (attacks::GetQueenAttacks(to, next_occ) & ksq_bb) {
+        return true;
+      }
+      break;
+    default:
+      break;
+  }
+
+  // Castling Rook Direct Check
+  if (mt == MoveType::kCastling) {
+    if (attacks::GetRookAttacks(rto, next_occ) & ksq_bb) {
+      return true;
+    }
+  }
+
+  // Discovered Check
+  Bitboard our_rq =
+      (Pieces(PieceType::kRook, us) | Pieces(PieceType::kQueen, us)) &
+      ~from_bb & ~to_bb;
+  if (mt == MoveType::kCastling) {
+    our_rq = (our_rq ^ SquareToBitboard(rfrom)) | SquareToBitboard(rto);
+  }
+  if (attacks::GetRookAttacks(ksq, next_occ) & our_rq) {
+    return true;
+  }
+
+  Bitboard our_bq =
+      (Pieces(PieceType::kBishop, us) | Pieces(PieceType::kQueen, us)) &
+      ~from_bb & ~to_bb;
+  if (attacks::GetBishopAttacks(ksq, next_occ) & our_bq) {
+    return true;
+  }
+
+  return false;
+}
+
 void ChessBoard::MakeNullMove(StateInfo& new_st) {
   new_st.prev_state = st_;
   new_st.zobrist_key = zobrist_key_;

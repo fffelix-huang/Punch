@@ -123,6 +123,7 @@ class ChessBoard {
 
   [[nodiscard]] Bitboard Checkers() const noexcept;
   [[nodiscard]] bool InCheck() const noexcept { return Checkers() != 0ULL; }
+  [[nodiscard]] bool GivesCheck(Move m) const noexcept;
 
  private:
   inline void PutPiece(Square sq, Piece pc) {

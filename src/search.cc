@@ -168,7 +168,7 @@ Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
   }
 
   // 3. Reverse Futility Pruning
-  if (!root_node && !board_.InCheck() && depth <= 5) {
+  if (!root_node && depth <= 5 && !board_.InCheck()) {
     Value rfp_margin = depth * 75;
 
     if (eval - rfp_margin >= beta) {
@@ -179,7 +179,7 @@ Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
   // 4. Null Move Pruning
   Bitboard non_pawn_materials =
       board_.Us(us) & (~board_.Pieces(PieceType::kPawn, us));
-  if (depth >= 3 && !board_.InCheck() && non_pawn_materials > 0) {
+  if (depth >= 3 && non_pawn_materials > 0 && !board_.InCheck()) {
     const int R = 2 + depth / 3;
 
     StateInfo st;
@@ -219,15 +219,16 @@ Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
 
   while ((m = picker.NextMove()) != Move::None()) {
     ++move_count;
-    bool is_quiet = !board_.InCheck() && !board_.IsCapture(m) &&
-                    m.TypeOf() != MoveType::kPromotion;
 
     // 6. Futility Pruning
     if (!root_node && move_count > 1 && non_pawn_materials > 0) {
       Value futility_margin = 110 + depth * 70;
 
-      if (depth <= std::max(move_count / 4, 1) && is_quiet &&
-          eval + futility_margin < alpha) {
+      bool is_quiet = !board_.InCheck() && !board_.IsCapture(m) &&
+                      m.TypeOf() != MoveType::kPromotion;
+
+      if (depth <= std::max(move_count / 4, 1) &&
+          eval + futility_margin < alpha && is_quiet) {
         continue;
       }
     }
