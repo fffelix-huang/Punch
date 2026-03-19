@@ -1,6 +1,7 @@
 #include "engine.h"
 
 #include <chrono>
+#include <format>
 #include <iostream>
 #include <memory>
 #include <span>
@@ -127,5 +128,20 @@ void Engine::Bench(size_t mb) {
 
 const OptionManager& Engine::GetOptions() const { return options_; }
 OptionManager& Engine::GetOptions() { return options_; }
+
+std::string Engine::Visualize() const {
+  std::ostringstream os;
+  os << board_.Visualize() << "\n";
+
+  int hashfull = tt_.Hashfull();
+  int occupied = static_cast<double>(hashfull) / 1000 * 50;
+  int size_mb = tt_.Size() * sizeof(TtEntry) / (1024 * 1024);
+
+  os << "Hashfull: [" << std::string(occupied, '#')
+     << std::string(50 - occupied, '.') << "] (" << hashfull << "/1000, "
+     << size_mb << " MB)";
+
+  return os.str();
+}
 
 }  // namespace punch

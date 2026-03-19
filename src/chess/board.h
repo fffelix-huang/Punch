@@ -125,6 +125,8 @@ class ChessBoard {
   [[nodiscard]] bool InCheck() const noexcept { return Checkers() != 0ULL; }
   [[nodiscard]] bool GivesCheck(Move m) const noexcept;
 
+  std::string Visualize() const;
+
  private:
   inline void PutPiece(Square sq, Piece pc) {
     board_[sq] = pc;

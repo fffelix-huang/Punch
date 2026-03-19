@@ -61,6 +61,7 @@ class TranspositionTable {
   }
 
   int Hashfull() const;
+  inline size_t Size() const { return size_; }
 
  private:
   std::vector<TtEntry> table_;

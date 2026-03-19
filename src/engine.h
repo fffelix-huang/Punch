@@ -29,6 +29,7 @@ class Engine {
   void Quit();
 
   void Bench(size_t mb = 16);
+  std::string Visualize() const;
 
   const OptionManager& GetOptions() const;
   OptionManager& GetOptions();

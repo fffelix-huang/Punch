@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <iomanip>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -504,6 +505,39 @@ void ChessBoard::UnmakeNullMove() {
   ep_square_ = st_->ep_square;
   zobrist_key_ = st_->zobrist_key;
   st_ = st_->prev_state;
+}
+
+std::string ChessBoard::Visualize() const {
+  static constexpr std::string_view kPieceToChar = " PNBRQK  pnbrqk";
+  std::ostringstream os;
+
+  os << "\n   +---+---+---+---+---+---+---+---+\n";
+  Square sq = Square::kA8;
+  for (int i = 0; i < 8; ++i) {
+    os << " " << 8 - i;
+    for (int j = 0; j < 8; ++j) {
+      os << " | " << kPieceToChar[PieceOn(sq)];
+      sq += Direction::kEast;
+    }
+    os << " |\n";
+    os << "   +---+---+---+---+---+---+---+---+\n";
+    sq += 8 * Direction::kWest;
+    sq += Direction::kSouth;
+  }
+  os << "     a   b   c   d   e   f   g   h\n";
+  os << "\nFen: " << GetFen();
+  os << "\nKey: " << std::setw(16) << std::setfill('0') << std::hex
+     << std::uppercase << zobrist_key_;
+  os << "\nCheckers:";
+
+  Bitboard checkers = Checkers();
+  while (checkers) {
+    Square checker = PopLsb(checkers);
+    os << " " << static_cast<char>('a' + FileOf(checker))
+       << static_cast<char>('1' + RankOf(checker));
+  }
+
+  return os.str();
 }
 
 }  // namespace punch

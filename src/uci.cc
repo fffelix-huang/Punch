@@ -72,6 +72,8 @@ void Loop(int argc, char* argv[]) {
       if (!engine.GetOptions().Set(name, value)) {
         std::cout << "No such option: " << name << std::endl;
       }
+    } else if (token == "d") {
+      std::cout << engine.Visualize() << std::endl;
     }
   }
 }
