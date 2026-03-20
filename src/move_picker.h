@@ -9,6 +9,8 @@
 
 namespace punch {
 
+bool StaticExchangeEvaluation(const ChessBoard& board, Move m, Value threshold);
+
 struct SearchStack;
 
 template <movegen::MoveGenType T>

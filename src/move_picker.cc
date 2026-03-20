@@ -2,12 +2,83 @@
 
 #include <algorithm>
 
+#include "chess/attacks.h"
 #include "chess/board.h"
 #include "chess/movegen.h"
 #include "chess/types.h"
 #include "search.h"
 
 namespace punch {
+
+bool StaticExchangeEvaluation(const ChessBoard& board, Move m,
+                              Value threshold) {
+  assert(board.IsCapture(m));
+
+  Square from = m.FromSquare();
+  Square to = m.ToSquare();
+  Color us = board.SideToMove();
+
+  Value gain = kPieceValue[TypeOf(board.PieceOn(to))] - threshold;
+  if (gain < 0) {
+    return false;
+  }
+
+  gain -= kPieceValue[TypeOf(board.PieceOn(from))];
+  if (gain >= 0) {
+    return true;
+  }
+
+  Bitboard occ = board.Occupied() ^ SquareToBitboard(from);
+  Bitboard attackers = board.AttackersTo(to, occ);
+
+  while (true) {
+    us = ~us;
+    attackers &= occ;
+    Bitboard our_attackers = attackers & board.Us(us);
+
+    if (our_attackers == 0) {
+      return us != board.SideToMove();
+    }
+
+    PieceType attacker_type = PieceType::kNoPieceType;
+
+    // Least Valuable Attacker
+    for (PieceType pt :
+         {PieceType::kPawn, PieceType::kKnight, PieceType::kBishop,
+          PieceType::kRook, PieceType::kQueen, PieceType::kKing}) {
+      Bitboard lva_bb = our_attackers & board.Pieces(pt);
+      if (lva_bb) {
+        Square attacker_sq = PopLsb(lva_bb);
+        occ ^= SquareToBitboard(attacker_sq);
+        attacker_type = pt;
+        break;
+      }
+    }
+
+    // Diagonal
+    if (attacker_type == PieceType::kPawn ||
+        attacker_type == PieceType::kBishop ||
+        attacker_type == PieceType::kQueen) {
+      attackers |=
+          attacks::GetBishopAttacks(to, occ) &
+          (board.Pieces(PieceType::kBishop) | board.Pieces(PieceType::kQueen));
+    }
+    // Horizontal & Vertical
+    if (attacker_type == PieceType::kRook ||
+        attacker_type == PieceType::kQueen) {
+      attackers |=
+          attacks::GetRookAttacks(to, occ) &
+          (board.Pieces(PieceType::kRook) | board.Pieces(PieceType::kQueen));
+    }
+
+    gain = -gain - kPieceValue[attacker_type] - 1;
+    if (gain >= 0) {
+      return us == board.SideToMove();
+    }
+  }
+
+  __builtin_unreachable();
+}
 
 template <movegen::MoveGenType T>
 MovePicker<T>::MovePicker(
@@ -42,9 +113,6 @@ int MovePicker<T>::ScoreMove(
     const std::array<
         std::array<std::array<int16_t, Square::kSquareNb>, Square::kSquareNb>,
         Color::kColorNb>& move_history) const {
-  // kNoPieceType, kPawn, kKnight, kBishop, kRook, kQueen, kKing,
-  static constexpr int kPieceValues[] = {0, 100, 290, 310, 500, 900, 0};
-
   const Color us = board.SideToMove();
 
   // 1. TT Move
@@ -72,8 +140,14 @@ int MovePicker<T>::ScoreMove(
   if (board.IsCapture(m)) {
     Piece attacker = board.PieceOn(m.FromSquare());
     Piece victim = board.PieceOn(m.ToSquare());
-    return 80000000 + (kPieceValues[TypeOf(victim)] * 10) -
-           kPieceValues[TypeOf(attacker)];
+    Value mvv_lva =
+        (kPieceValue[TypeOf(victim)] * 10) - kPieceValue[TypeOf(attacker)];
+
+    if (StaticExchangeEvaluation(board, m, -80)) {
+      return 80000000 + mvv_lva;
+    } else {
+      return 30000000 + mvv_lva;
+    }
   }
 
   // 4. Killer Moves

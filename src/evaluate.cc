@@ -11,9 +11,6 @@ namespace punch::eval {
 
 namespace {
 
-constexpr Value kPieceValue[] = {Value(0),   Value(100), Value(290), Value(310),
-                                 Value(500), Value(900), Value(0)};
-
 constexpr std::array<std::array<Bitboard, Square::kSquareNb>, Color::kColorNb>
     kPassedPawnMask = [] {
       std::array<std::array<Bitboard, Square::kSquareNb>, Color::kColorNb>

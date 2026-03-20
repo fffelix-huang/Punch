@@ -93,6 +93,10 @@ enum Piece : uint8_t {
 };
 // clang-format on
 
+// kNoPieceType, kPawn, kKnight, kBishop, kRook, kQueen, kKing,
+constexpr Value kPieceValue[] = {Value(0),   Value(100), Value(290), Value(310),
+                                 Value(500), Value(900), Value(0)};
+
 using Depth = int;
 
 // clang-format off
