@@ -109,6 +109,25 @@ Value Evaluate(const ChessBoard& board) {
     coeff *= -1;
   }
 
+  // Rook on Open File Bonus
+  Bitboard all_pawns = board.Pieces(PieceType::kPawn);
+
+  for (Color c : {us, ~us}) {
+    Bitboard rooks = board.Pieces(PieceType::kRook, c);
+    int open_file_rooks = 0;
+
+    while (rooks) {
+      Square rook = PopLsb(rooks);
+      File f = FileOf(rook);
+      if ((all_pawns & GetFileBitboard(f)) == 0) {
+        open_file_rooks++;
+      }
+    }
+
+    score += coeff * open_file_rooks * open_file_rooks * 10;
+    coeff *= -1;
+  }
+
   return score;
 }
 
