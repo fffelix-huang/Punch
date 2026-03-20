@@ -202,6 +202,22 @@ TEST_F(BoardTest, NullMove) {
   EXPECT_EQ(board.GetHashKey(), initial_key);
 }
 
+TEST_F(BoardTest, AttackersTo) {
+  ChessBoard board("7k/8/1bnrnb2/1n3n2/1r1K1r2/1n3n2/1bnrnb2/8 w - - 0 1");
+
+  // clang-format off
+  Bitboard expected = SquaresToBitboard(
+    Square::kB6, Square::kC6, Square::kD6, Square::kE6, Square::kF6,
+    Square::kB5,                                        Square::kF5,
+    Square::kB4,            /*Square::kD4*/             Square::kF4,
+    Square::kB3,                                        Square::kF3,
+    Square::kB2, Square::kC2, Square::kD2, Square::kE2, Square::kF2
+  );
+  // clang-format on
+
+  EXPECT_EQ(board.AttackersTo(Square::kD4), expected);
+}
+
 TEST_F(BoardTest, IsAttacked) {
   ChessBoard board(
       "r1bqkbnr/pppp1ppp/2n5/8/2BpP3/5N2/PPP2PPP/RNBQK2R w KQkq - 0 1");

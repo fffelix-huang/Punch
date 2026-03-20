@@ -327,47 +327,31 @@ void ChessBoard::UnmakeMove(Move m) {
   st_ = st_->prev_state;
 }
 
+Bitboard ChessBoard::AttackersTo(Square sq) const {
+  return AttackersTo(sq, Occupied());
+}
+
+Bitboard ChessBoard::AttackersTo(Square sq, Bitboard occupied) const {
+  // clang-format off
+  return (attacks::GetPawnAttacks(sq, Color::kWhite) & Pieces(PieceType::kPawn, Color::kBlack))
+         | (attacks::GetPawnAttacks(sq, Color::kBlack) & Pieces(PieceType::kPawn, Color::kWhite))
+         | (attacks::GetKnightAttacks(sq) & Pieces(PieceType::kKnight))
+         | (attacks::GetBishopAttacks(sq, occupied) & (Pieces(PieceType::kBishop) | Pieces(PieceType::kQueen)))
+         | (attacks::GetRookAttacks(sq, occupied) & (Pieces(PieceType::kRook) | Pieces(PieceType::kQueen)))
+         | (attacks::GetKingAttacks(sq) & Pieces(PieceType::kKing));
+  // clang-format on
+}
+
 bool ChessBoard::IsAttacked(Square sq, Color by_color) const {
-  Bitboard occ = Occupied();
-  // A square is attacked by color C if a pawn of color ~C at sq would attack a
-  // C pawn
-  if (attacks::GetPawnAttacks(sq, ~by_color) &
-      Pieces(PieceType::kPawn, by_color))
-    return true;
-  if (attacks::GetKnightAttacks(sq) & Pieces(PieceType::kKnight, by_color))
-    return true;
-  if (attacks::GetKingAttacks(sq) & Pieces(PieceType::kKing, by_color))
-    return true;
-  if (attacks::GetBishopAttacks(sq, occ) &
-      (Pieces(PieceType::kBishop, by_color) |
-       Pieces(PieceType::kQueen, by_color)))
-    return true;
-  if (attacks::GetRookAttacks(sq, occ) & (Pieces(PieceType::kRook, by_color) |
-                                          Pieces(PieceType::kQueen, by_color)))
-    return true;
-  return false;
+  return AttackersTo(sq, Occupied()) & Us(by_color);
 }
 
 Bitboard ChessBoard::Checkers() const noexcept {
   Color us = side_to_move_;
   Color them = ~us;
   Square ksq = KingSquare(us);
-
   Bitboard occ = Occupied();
-  Bitboard checkers = 0ULL;
-
-  // A king at ksq is attacked by color 'them' if a pawn of color 'us' at ksq
-  // would attack a 'them' pawn
-  checkers |= attacks::GetPawnAttacks(ksq, us) & Pieces(PieceType::kPawn, them);
-  checkers |= attacks::GetKnightAttacks(ksq) & Pieces(PieceType::kKnight, them);
-  checkers |=
-      attacks::GetBishopAttacks(ksq, occ) &
-      (Pieces(PieceType::kBishop, them) | Pieces(PieceType::kQueen, them));
-  checkers |=
-      attacks::GetRookAttacks(ksq, occ) &
-      (Pieces(PieceType::kRook, them) | Pieces(PieceType::kQueen, them));
-
-  return checkers;
+  return AttackersTo(ksq, occ) & Us(them);
 }
 
 bool ChessBoard::GivesCheck(Move m) const noexcept {

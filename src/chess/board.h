@@ -119,6 +119,8 @@ class ChessBoard {
   void MakeNullMove(StateInfo& new_st);
   void UnmakeNullMove();
 
+  [[nodiscard]] Bitboard AttackersTo(Square sq) const;
+  [[nodiscard]] Bitboard AttackersTo(Square sq, Bitboard occupied) const;
   [[nodiscard]] bool IsAttacked(Square sq, Color by_color) const;
 
   [[nodiscard]] Bitboard Checkers() const noexcept;
