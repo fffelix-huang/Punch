@@ -2,6 +2,8 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
+
 #include "chess/attacks.h"
 #include "chess/board.h"
 #include "chess/types.h"
@@ -121,6 +123,60 @@ TEST_F(MoveGenTest, Checkmate) {
   MoveList moves;
   GenerateLegalMoves(board, moves);
   EXPECT_EQ(moves.size(), 0UL);
+}
+
+TEST_F(MoveGenTest, NoDuplicateMoves) {
+  constexpr std::string_view fens[] = {
+      "rnbqkbnr/pppp1ppp/8/4p3/4N3/8/PPPPPPPP/RNBQKB1R w KQkq - 0 1",
+      "r1bqk2r/pppp1ppp/5n2/b7/2BQP3/2P5/PP3PPP/RNB1K2R w KQkq - 0 1",
+      "4k3/1P6/8/8/8/8/8/4K3 w - - 0 1",
+      "8/2P1k3/8/8/8/8/8/4K3 w - - 0 1",
+      "8/2P5/4k3/8/8/8/8/4K3 w - - 0 1",
+      "8/8/8/R2Pp2k/8/8/8/4K3 w - e6 0 1",
+      "7k/8/8/3Pp3/8/8/8/B3K3 w - e6 0 1",
+      "8/5k2/8/3Pp3/8/8/8/4K3 w - e6 0 1",
+      "8/7k/8/3Pp3/8/8/8/4K3 w - e6 0 1",
+      "5k2/8/8/8/8/8/8/4K2R w K - 0 1",
+      "5k2/8/8/8/8/8/5P2/4K2R w - - 0 1",
+      "3k4/8/8/8/8/8/8/R3K3 w Q - 0 1",
+      "3k4/8/8/8/8/8/3P4/R3K3 w Q - 0 1",
+      "4k2r/8/8/8/8/8/8/5K2 b k - 0 1",
+      "4k2r/5p2/8/8/8/8/8/5K2 b k - 0 1",
+      "r3k3/8/8/8/8/8/8/3K4 b q - 0 1",
+      "r3k3/3p4/8/8/8/8/8/3K4 b q - 0 1",
+  };
+
+  ChessBoard board;
+
+  for (std::string_view fen : fens) {
+    board.LoadFen(fen);
+
+    movegen::MoveList all_moves;
+    movegen::GenerateLegalMoves<movegen::MoveGenType::kAll>(board, all_moves);
+
+    movegen::MoveList capture_moves;
+    movegen::GenerateLegalMoves<movegen::MoveGenType::kCaptures>(board,
+                                                                 capture_moves);
+    movegen::MoveList quiet_moves;
+    movegen::GenerateLegalMoves<movegen::MoveGenType::kQuiets>(board,
+                                                               quiet_moves);
+
+    EXPECT_EQ(all_moves.size(), capture_moves.size() + quiet_moves.size());
+
+    movegen::MoveList combined = capture_moves;
+    for (Move m : quiet_moves) {
+      combined.push_back(m);
+    }
+
+    auto cmp = [](Move a, Move b) -> bool { return a.Raw() < b.Raw(); };
+
+    std::ranges::sort(all_moves, cmp);
+    std::ranges::sort(combined, cmp);
+
+    for (size_t i = 0; i < all_moves.size(); ++i) {
+      EXPECT_EQ(all_moves[i], combined[i]);
+    }
+  }
 }
 
 }  // namespace punch::movegen::test
