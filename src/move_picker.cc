@@ -14,11 +14,14 @@ bool StaticExchangeEvaluation(const ChessBoard& board, Move m,
                               Value threshold) {
   assert(board.IsCapture(m));
 
+  Color us = board.SideToMove();
+  MoveType mt = m.TypeOf();
   Square from = m.FromSquare();
   Square to = m.ToSquare();
-  Color us = board.SideToMove();
+  Square captured_sq =
+      (mt != MoveType::kEnPassant ? to : to - PawnDirection(~us));
 
-  Value gain = kPieceValue[TypeOf(board.PieceOn(to))] - threshold;
+  Value gain = kPieceValue[TypeOf(board.PieceOn(captured_sq))] - threshold;
   if (gain < 0) {
     return false;
   }
@@ -29,6 +32,10 @@ bool StaticExchangeEvaluation(const ChessBoard& board, Move m,
   }
 
   Bitboard occ = board.Occupied() ^ SquareToBitboard(from);
+  if (mt == MoveType::kEnPassant) {
+    occ ^= SquareToBitboard(captured_sq);
+  }
+
   Bitboard attackers = board.AttackersTo(to, occ);
 
   while (true) {
