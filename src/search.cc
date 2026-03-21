@@ -82,6 +82,11 @@ Value Worker::QuiescenceSearch(SearchStack* ss, Value alpha, Value beta) {
   Value best_score = static_eval;
 
   while ((m = picker.NextMove()) != Move::None()) {
+    // 4. SEE Pruning
+    if (!StaticExchangeEvaluation(board_, m, 0)) {
+      continue;
+    }
+
     StateInfo st;
     board_.MakeMove(m, st);
 
