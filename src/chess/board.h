@@ -66,7 +66,7 @@ class ChessBoard {
 
   [[nodiscard]] inline bool IsCapture(Move m) const {
     const Square& to = m.ToSquare();
-    return PieceOn(to) != Piece::kNoPiece || m.TypeOf() == MoveType::kPromotion;
+    return PieceOn(to) != Piece::kNoPiece || m.TypeOf() == MoveType::kEnPassant;
   }
 
   [[nodiscard]] bool IsRepetition() const noexcept {

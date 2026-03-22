@@ -234,8 +234,8 @@ Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
   while ((m = picker.NextMove()) != Move::None()) {
     ++move_count;
 
-    bool is_quiet = !board_.InCheck() && !board_.IsCapture(m) &&
-                    m.TypeOf() != MoveType::kPromotion;
+    bool is_quiet = m.TypeOf() != MoveType::kPromotion && !board_.InCheck() &&
+                    !board_.IsCapture(m);
 
     if (!root_node) {
       // 7. Late Move Pruning
@@ -302,7 +302,7 @@ Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
         ss->pv_length = next_pv_length + 1;
 
         if (alpha >= beta) {
-          if (!board_.IsCapture(m)) {
+          if (m != tt_move && is_quiet) {
             // Update Killer Moves
             if (m != ss->killers[0]) {
               ss->killers[1] = ss->killers[0];
