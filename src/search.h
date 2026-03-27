@@ -10,6 +10,7 @@
 #include "chess/board.h"
 #include "chess/types.h"
 #include "transposition_table.h"
+#include "utils/multiarray.h"
 
 namespace punch {
 
@@ -19,6 +20,15 @@ struct SearchStack {
 
   std::array<Move, kMaxPly> pv_line;
   int pv_length;
+};
+
+struct SearchTable {
+  MultiArray<int16_t, Color::kColorNb, Square::kSquareNb, Square::kSquareNb>
+      move_history;
+
+  void Clear();
+  void Age();
+  void UpdateHistory(int16_t& entry, int bonus);
 };
 
 struct SearchLimits {
@@ -81,10 +91,7 @@ class Worker {
   SearchLimits limits_;
   std::unique_ptr<TimeManager> tm_;
 
-  std::array<
-      std::array<std::array<int16_t, Square::kSquareNb>, Square::kSquareNb>,
-      Color::kColorNb>
-      move_history_;
+  SearchTable tables_;
 
   uint64_t nodes_;
   int seldepth_;

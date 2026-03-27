@@ -88,14 +88,11 @@ bool StaticExchangeEvaluation(const ChessBoard& board, Move m,
 }
 
 template <movegen::MoveGenType T>
-MovePicker<T>::MovePicker(
-    const ChessBoard& board, SearchStack* ss, Move tt_move,
-    const std::array<
-        std::array<std::array<int16_t, Square::kSquareNb>, Square::kSquareNb>,
-        Color::kColorNb>& move_history) {
+MovePicker<T>::MovePicker(const ChessBoard& board, SearchStack* ss,
+                          Move tt_move, const SearchTable& tables) {
   movegen::GenerateLegalMoves<T>(board, moves);
   for (size_t i = 0; i < moves.size(); ++i) {
-    scores[i] = ScoreMove(board, ss, moves[i], tt_move, move_history);
+    scores[i] = ScoreMove(board, ss, moves[i], tt_move, tables);
   }
 }
 
@@ -115,11 +112,8 @@ Move MovePicker<T>::NextMove() {
 }
 
 template <movegen::MoveGenType T>
-int MovePicker<T>::ScoreMove(
-    const ChessBoard& board, SearchStack* ss, Move m, Move tt_move,
-    const std::array<
-        std::array<std::array<int16_t, Square::kSquareNb>, Square::kSquareNb>,
-        Color::kColorNb>& move_history) const {
+int MovePicker<T>::ScoreMove(const ChessBoard& board, SearchStack* ss, Move m,
+                             Move tt_move, const SearchTable& tables) const {
   const Color us = board.SideToMove();
 
   // 1. TT Move
@@ -146,7 +140,9 @@ int MovePicker<T>::ScoreMove(
   // 3. Captures
   if (board.IsCapture(m)) {
     Piece attacker = board.PieceOn(m.FromSquare());
-    Piece victim = board.PieceOn(m.ToSquare());
+    Piece victim =
+        (m.TypeOf() != MoveType::kEnPassant ? board.PieceOn(m.ToSquare())
+                                            : MakePiece(~us, PieceType::kPawn));
     Value mvv_lva =
         (kPieceValue[TypeOf(victim)] * 10) - kPieceValue[TypeOf(attacker)];
 
@@ -165,7 +161,7 @@ int MovePicker<T>::ScoreMove(
   }
 
   // 5. Quiet History Moves
-  return move_history[us][m.FromSquare()][m.ToSquare()];
+  return tables.move_history[us][m.FromSquare()][m.ToSquare()];
 }
 
 template class MovePicker<movegen::MoveGenType::kAll>;

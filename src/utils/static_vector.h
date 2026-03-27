@@ -1,5 +1,5 @@
-#ifndef PUNCH_CHESS_UTILS_STATIC_VECTOR_H_
-#define PUNCH_CHESS_UTILS_STATIC_VECTOR_H_
+#ifndef PUNCH_UTILS_STATIC_VECTOR_H_
+#define PUNCH_UTILS_STATIC_VECTOR_H_
 
 #include <array>
 #include <cassert>
@@ -87,4 +87,4 @@ class StaticVector {
 
 }  // namespace punch
 
-#endif  // PUNCH_CHESS_UTILS_STATIC_VECTOR_H_
+#endif  // PUNCH_UTILS_STATIC_VECTOR_H_

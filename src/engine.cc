@@ -92,7 +92,7 @@ void Engine::Bench(size_t mb) {
   JoinThread();
 
   tt_.Resize(mb);
-  tt_.Clear();
+  NewGame();
 
   const size_t num_positions = bench::kBenchPositions.size();
   uint64_t total_nodes = 0;

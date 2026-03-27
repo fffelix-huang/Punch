@@ -17,13 +17,27 @@ namespace punch {
 Worker::Worker(TranspositionTable& tt) : tt_(tt) {}
 Worker::~Worker() = default;
 
-void Worker::Clear() {
-  for (auto& c : move_history_) {
+void SearchTable::Clear() {
+  for (auto& c : move_history) {
     for (auto& f : c) {
       f.fill(0);
     }
   }
 }
+
+void SearchTable::Age() {
+  for (int c = 0; c < Color::kColorNb; ++c) {
+    for (int from = 0; from < Square::kSquareNb; ++from) {
+      for (int to = 0; to < Square::kSquareNb; ++to) {
+        move_history[c][from][to] /= 2;
+      }
+    }
+  }
+}
+
+void SearchTable::UpdateHistory(int16_t& entry, int bonus) { entry += bonus; }
+
+void Worker::Clear() { tables_.Clear(); }
 
 Value Worker::QuiescenceSearch(SearchStack* ss, Value alpha, Value beta) {
   const bool root_node = (ss->ply == 0);
@@ -71,7 +85,7 @@ Value Worker::QuiescenceSearch(SearchStack* ss, Value alpha, Value beta) {
   alpha = std::max(alpha, static_eval);
 
   MovePicker<movegen::MoveGenType::kCaptures> picker(board_, ss, tt_move,
-                                                     move_history_);
+                                                     tables_);
 
   if (picker.NumMoves() == 0) {
     return static_eval;
@@ -219,8 +233,7 @@ Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
 
   depth = std::min(depth, kMaxPly - 1);
 
-  MovePicker<movegen::MoveGenType::kAll> picker(board_, ss, tt_move,
-                                                move_history_);
+  MovePicker<movegen::MoveGenType::kAll> picker(board_, ss, tt_move, tables_);
 
   if (picker.NumMoves() == 0) {
     return board_.InCheck() ? MatedIn(ply) : kValueDraw;
@@ -231,11 +244,14 @@ Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
   Value best_score = -kValueInf;
   int move_count = 0;
 
+  movegen::MoveList searched_captures;
+
   while ((m = picker.NextMove()) != Move::None()) {
     ++move_count;
 
-    bool is_quiet = m.TypeOf() != MoveType::kPromotion && !board_.InCheck() &&
-                    !board_.IsCapture(m);
+    bool is_capture = board_.IsCapture(m);
+    bool is_quiet =
+        m.TypeOf() != MoveType::kPromotion && !is_capture && !board_.InCheck();
 
     if (!root_node) {
       // 7. Late Move Pruning
@@ -302,6 +318,8 @@ Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
         ss->pv_length = next_pv_length + 1;
 
         if (alpha >= beta) {
+          int bonus = std::min(depth * depth, 2500);
+
           if (m != tt_move && is_quiet) {
             // Update Killer Moves
             if (m != ss->killers[0]) {
@@ -310,7 +328,8 @@ Value Worker::Negamax(SearchStack* ss, int depth, Value alpha, Value beta) {
             }
 
             // Update Move History Heuristic
-            move_history_[us][m.FromSquare()][m.ToSquare()] += depth * depth;
+            tables_.UpdateHistory(
+                tables_.move_history[us][m.FromSquare()][m.ToSquare()], bonus);
           }
           break;
         }
@@ -333,14 +352,8 @@ void Worker::IterativeDeepening(int depth_limit) {
     ss[ply].ply = ply;
   }
 
-  // Apply aging to move history heuristic
-  for (int c = 0; c < Color::kColorNb; ++c) {
-    for (int from = 0; from < Square::kSquareNb; ++from) {
-      for (int to = 0; to < Square::kSquareNb; ++to) {
-        move_history_[c][from][to] /= 2;
-      }
-    }
-  }
+  // Apply aging to search tables
+  tables_.Age();
 
   Move best_move = Move::None();
 

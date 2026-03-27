@@ -12,22 +12,18 @@ namespace punch {
 bool StaticExchangeEvaluation(const ChessBoard& board, Move m, Value threshold);
 
 struct SearchStack;
+struct SearchTable;
 
 template <movegen::MoveGenType T>
 class MovePicker {
  public:
   MovePicker(const ChessBoard& board, SearchStack* ss, Move tt_move,
-             const std::array<std::array<std::array<int16_t, Square::kSquareNb>,
-                                         Square::kSquareNb>,
-                              Color::kColorNb>& move_history);
+             const SearchTable& tables);
 
   Move NextMove();
 
-  inline int ScoreMove(
-      const ChessBoard& board, SearchStack* ss, Move m, Move tt_move,
-      const std::array<
-          std::array<std::array<int16_t, Square::kSquareNb>, Square::kSquareNb>,
-          Color::kColorNb>& move_history) const;
+  inline int ScoreMove(const ChessBoard& board, SearchStack* ss, Move m,
+                       Move tt_move, const SearchTable& tables) const;
 
   inline size_t NumMoves() const { return moves.size(); }
 
